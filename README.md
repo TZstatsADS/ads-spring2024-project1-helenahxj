@@ -10,7 +10,7 @@ This is the first and only *individual* (as opposed to *team*) this semester.
 Term: Spring 2024
 
 + Projec title: What makes a happy marriage?
-+ This project is conducted by Helena Hu
++ This project is conducted by Helena Hu.
 
 + Project summary: "Marriage is not easy." People always says, "However, if you are willing to work and submit to the process, it promises great reward." But how exactly? We're going to delve into this statement using data from HappyDB, focusing specifically on married individuals, applying word cloud and bar plot analyses to decipher the key elements that contribute to marital happiness.
 
