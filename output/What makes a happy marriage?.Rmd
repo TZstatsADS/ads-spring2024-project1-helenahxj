@@ -1,0 +1,211 @@
+---
+title: "What makes a happy marriage?"
+output:
+  html_document:
+    df_print: paged
+---
+
+<img src="figs/marriage.png" width="400" height="400"/>
+
+"Marriage is not easy." People always says, "However, if you are willing to work and submit to the process, it promises great reward." But how exactly?
+
+To answer this question, we can gain some insights from married couples. I combine the 'cleaned_hm.csv' with 'demographic.csv' in [HappyDB](https://megagon.ai/happydb-a-happiness-database-of-100000-happy-moments/), focusing specifically on married individuals (and also based on parenthood for part of the analysis). I used word cloud and bar plot analyses to decipher the key elements that contribute to marital happiness (redundant and meaningless word will be ignored).
+
+This report is prepared with the following environmental settings.
+```{r}
+print(R.version)
+```
+
+
+```{r, message=FALSE, echo=FALSE}
+library(readr)
+library(dplyr)
+library(wordcloud)
+library(RColorBrewer)
+library(tm)
+library(ggplot2)
+```
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+# merge data
+words <- read_csv("data/cleaned_hm.csv")
+demo <- read_csv("data/demographic.csv")
+merged_data <- merge(words, demo, by = 'wid')
+```
+
+```{r, echo=FALSE}
+# define functions for generating relevant plots for later use
+generate_wordcloud <- function(data, title, noise) {
+  # remove punctuation, numbers, redundant words, etc.
+  corpus <- VCorpus(VectorSource(data$cleaned_hm))
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removeWords, c(stopwords("english"), noise))
+  
+  wordcloud(corpus, scale=c(3,0.5), max.words=50, random.order=FALSE, colors=brewer.pal(8, "Dark2"))
+  title(main = title)
+}
+
+generate_barplot <- function(data, title, noise) {
+  # remove punctuation, numbers, redundant words, etc.
+  corpus <- VCorpus(VectorSource(data$cleaned_hm))
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removeWords, c(stopwords("english"), noise))
+
+  dtm <- TermDocumentMatrix(corpus)
+  m <- as.matrix(dtm)
+  v <- sort(rowSums(m), decreasing=TRUE)
+  d <- data.frame(word = names(v), freq=v)
+
+  ggplot(head(d, 10), aes(x=reorder(word, freq), y=freq)) +
+    geom_bar(stat="identity") +
+    coord_flip() +
+    xlab("Word") +
+    ylab("Frequency") +
+    ggtitle(title) +
+    theme_minimal()
+}
+
+generate_pieplot <- function(full_data, spouse_data, child_data, friend_data, title) {
+    total <- nrow(full_data)
+    spouse <- nrow(spouse_data)
+    child <- nrow(child_data)
+    friend <- nrow(friend_data)
+
+    spouse_percentage <- spouse / total * 100
+    child_percentage <- child / total * 100
+    friend_percentage <- friend / total * 100
+    other_percentage <- 100 - spouse_percentage - child_percentage - friend_percentage
+
+    pie_data <- c(spouse_percentage, child_percentage, friend_percentage, other_percentage)
+    names(pie_data) <- c("Spouse", "Kids", "Friends", "Other")
+    
+    pie(pie_data, main = title, col = c("lightblue", "lightcoral", "lightgreen", "lightyellow"), labels = paste(names(pie_data), ": ", round(pie_data, 2), "%"))
+}
+```
+
+```{r, echo=FALSE}
+noise_word <- c('happy', 'day', 'got', 'went', 'today', 'made', 'one', 'two', 'time', 'last', 'first', 'going', 'getting', 'took', 'found', 'lot', 'really', 'saw', 'see', 'month', 'week', 'day', 'yesterday', 'year', 'ago', 'now', 'still', 'since', 'so', 'something', 'great', 'good', 'long', 'I', 'was', 'a', 'lot', 'bad', 'best', 'able', 'can', 'also', 'like', 'came', 'get', 'watched', 'enjoyed', 'enjoy', 'even', 'didnt', 'much', 'more', 'felt', 'feel', 'moment', 'will')
+```
+
+## Question 1: Who makes married people happy?
+A happy marriage requires a happy husband and wife, so as a first step I wanted to know what things and specific people can make both parties happy in a marriage.
+```{r, echo=FALSE}
+married <- merged_data %>% filter(marital == "married")
+married_men <- married %>% filter(gender == "m")
+married_women <- married %>% filter(gender == "f")
+```
+
+```{r, echo=FALSE}
+generate_wordcloud(married_men, "Married Men", noise_word)
+generate_wordcloud(married_women, "Married Women", noise_word)
+```
+
+**Happiness in marriage are closely related to the spouse,** as a huge part of happy moment description for married men and women contain the keywords "wife" and "husband". Meanwhile, there's difference that for married women, their husbands bring them significant happiness compared to other things, while men find almost equal happiness in work-related achievements.
+
+Let's see in a more intuitive way by plotting the pie chart that shows the percentage of happy moment related to three main relationships (spouse, kids, friends). 
+```{r, echo=FALSE}
+# filter married people who mentioned happiness related to their spouse
+married_men_spouse <- married_men %>% 
+  filter(grepl('husband|wife|spouse|partner', cleaned_hm, ignore.case = TRUE))
+married_women_spouse <- married_women %>% 
+  filter(grepl('husband|wife|spouse|partner', cleaned_hm, ignore.case = TRUE))
+```
+
+```{r, echo=FALSE}
+married_men_child <- married_men %>% 
+  filter(grepl('daughter|son|daughters|sons', cleaned_hm, ignore.case = TRUE))
+married_women_child <- married_women %>% 
+  filter(grepl('daughter|son|daughters|sons', cleaned_hm, ignore.case = TRUE))
+married_men_friend <- married_men %>% 
+  filter(grepl('friend|friends', cleaned_hm, ignore.case = TRUE))
+married_women_friend <- married_women %>% 
+  filter(grepl('friend|friends', cleaned_hm, ignore.case = TRUE))
+```
+
+```{r, echo=FALSE}
+generate_pieplot(married_men, married_men_spouse, married_men_child, married_men_friend, "Percentage of Happy Moments for Married Men")
+generate_pieplot(married_women, married_women_spouse, married_women_child, married_women_friend, "Percentage of Happy Moments for Married Women")
+```
+
+Pie chart shows similar results, but at the same time, what word cloud does not show is that kids are also an important factor in making married couples happy, so we will discuss the impact of children on the happy marriage later.
+
+## Question 2: What should people do to make their spouse happy?
+From results above we can conclude that a happy marriage mainly depends on the behavior of the spouse. So I want to know, for men and women respectively, what their spouses need to do to make them happy.
+```{r, echo=FALSE}
+update_noise <- c('husband', 'wife', 'spouse', 'partner', noise_word)
+```
+
+```{r, echo=FALSE}
+generate_wordcloud(married_men_spouse, "Happy Moment related to Spouse for Married Men", update_noise)
+generate_wordcloud(married_women_spouse, "Happy Moment related to Spouse for Married Women", update_noise)
+```
+
+Having dinner together and spend more time together at home could make a marriage happy, since they are mentioned a lot in the happy moment for both married men and women.
+
+We can see more clearly through bar plot that shows 10 most frequent words in happy moment. "home", "work", "dinner" are top 3 words mentioned in the happy moment for both married men and women, and we can see some common keyword like "together", "night".
+```{r, echo=FALSE}
+generate_barplot(married_men_spouse, "Word Frequency in Happy Moment Related to Wife for Married Men", update_noise)
+generate_barplot(married_women_spouse, "Word Frequency in Happy Moment Related to Husband for Married Women", update_noise)
+```
+
+**Based on the result, we could make a preliminary conclusion that the key to have a happy marriage is about accompany,** spending more time together at home, having dinner with the one you love, and be at home at night. It is worth mentioning that for married men, 'dinner' was a standout theme, indicating its importance in their marital happiness, while women showed a more balanced appreciation for activities. 
+
+Besides, **women focus more on the surprises and special occasions like birthday and anniversary. Husband should put effort into celebrating special occasions to maintain a happy marriage.**
+
+These are my inferences merely based on the words. What exactly does "dinner", "home", and "work" refer to? I selected 10 happy moments that contain those words from married men and women respectively.In order to ensure the results are representative, I proceed many times, but in this report I'm only able to reflect one of these results.
+
+For married men:
+```{r, echo=FALSE}
+married_men_happy <- married_men_spouse %>% 
+  filter(grepl('home|work|dinner', cleaned_hm, ignore.case = TRUE))
+
+print(married_men_happy$cleaned_hm[sample(nrow(married_men_happy), 10)])
+```
+
+For married women:
+```{r, echo=FALSE}
+married_women_happy <- married_women_spouse %>% 
+  filter(grepl('home|work|dinner', cleaned_hm, ignore.case = TRUE))
+
+print(married_women_happy$cleaned_hm[sample(nrow(married_women_happy), 10)])
+```
+
+From the results, it can be further confirmed that for both men and women, **their happiness is most reflected in the company of their spouse,** including their spouse coming home on time, being willing to spend quality time together and did something interesting, and their spouse making progress at work. Except for that, most people also mentioned the surprise made them happy.
+
+## Question 3: Does it change after having kids?
+Does the key factor of a happy marriage change after having kids? Let's explore if there's difference by comparing the happy moment of married couples with and without kids according to the parenthood status.
+```{r, echo=FALSE}
+haschild_married_men <- married_men_spouse %>% filter(parenthood == 'y')
+haschild_married_women <- married_women_spouse %>% filter(parenthood == 'y')
+nochild_married_men <- married_men_spouse %>% filter(parenthood == 'n')
+nochild_married_women <- married_women_spouse %>% filter(parenthood == 'n')
+```
+
+### Married Men
+```{r, echo=FALSE}
+generate_wordcloud(nochild_married_men, "No kids", update_noise)
+generate_wordcloud(haschild_married_men, "Has kids", update_noise)
+generate_barplot(nochild_married_men, "No kids", update_noise)
+generate_barplot(haschild_married_men, "Has kids", update_noise)
+```
+
+After having kids, "dinner" still appears most frequently for married men. **Having dinner together is really important for married men regardless of the existence of kids.**
+
+### Married Women
+```{r, echo=FALSE}
+generate_wordcloud(nochild_married_women, "No kids", update_noise)
+generate_wordcloud(haschild_married_women, "Has kids", update_noise)
+generate_barplot(nochild_married_women, "No kids", update_noise)
+generate_barplot(haschild_married_women, "Has kids", update_noise)
+```
+
+Spending time together remains important for happy marriage after having kids, the difference is that for both gender, emphasis on "work" increased a lot after having kids, especially for women. The results suggest a shift in priorities, balancing family time with professional achievements. **Partner's progress on work would contribute to a happy marriage after having kids.**
+
+## Conclusions
+* The secret to a happy marriage is companionship. Married couples should spend more quality time with their spouse, have dinner together, and spend more time at home to have a happy marriage.
+* To make their spouses happy, husbands should put more effort into preparing surprises and wives should have dinner with their spouses more often.
+* After having kids, the key of a happy marriage shifted to work. Married couples expected their spouse to make progress on work to share responsibilities and support family together.
